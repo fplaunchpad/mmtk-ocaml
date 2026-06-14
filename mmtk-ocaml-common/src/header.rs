@@ -30,6 +30,8 @@ pub fn tag_of(header: usize) -> u8 {
 
 // ── Block tags (from runtime/caml/mlvalues.h) ─────────────────────────────
 // Tags 0..245     ordinary blocks    all fields are OCaml values
+pub const TAG_FORCING:      u8 = 244;
+pub const TAG_CONTINUATION: u8 = 245;
 pub const TAG_LAZY:         u8 = 246; // lazy thunk; field 0 = thunk or value
 pub const TAG_CLOSURE:      u8 = 247; // function closure; field 0 = code ptr (NOT a GC root)
 pub const TAG_OBJECT:       u8 = 248; // OO object; all fields are values
