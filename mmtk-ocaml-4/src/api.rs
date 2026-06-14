@@ -41,9 +41,10 @@ pub extern "C" fn mmtk_init(heap_size: usize, plan: *const libc::c_char) {
         memory_manager::process(&mut builder, "plan", plan_str),
         "unknown MMTk plan: {}", plan_str
     );
+    let gc_trigger_val = format!("FixedHeapSize:{}", heap_size);
     assert!(
-        memory_manager::process(&mut builder, "heap_size", &heap_size.to_string()),
-        "failed to set heap_size"
+        memory_manager::process(&mut builder, "gc_trigger", &gc_trigger_val),
+        "failed to set gc_trigger (heap_size)"
     );
 
     let mmtk_instance = memory_manager::mmtk_init::<OCaml4VM>(&builder);
@@ -51,6 +52,19 @@ pub extern "C" fn mmtk_init(heap_size: usize, plan: *const libc::c_char) {
         .set(mmtk_instance)
         .ok()
         .expect("mmtk_init called more than once");
+}
+
+// ── Collection initialisation ─────────────────────────────────────────────
+
+/// Start MMTk GC worker threads.  Call once after mmtk_init and before any allocation.
+///
+/// `tls` — the calling thread's ID (e.g. pthread_self() cast to usize).
+#[no_mangle]
+pub extern "C" fn mmtk_initialize_collection(tls: usize) {
+    let tls = VMThread(OpaquePointer::from_address(
+        unsafe { Address::from_usize(tls) },
+    ));
+    memory_manager::initialize_collection::<OCaml4VM>(mmtk(), tls);
 }
 
 // ── Mutator lifecycle ─────────────────────────────────────────────────────
@@ -117,6 +131,7 @@ pub extern "C" fn mmtk_alloc(
         unsafe { ObjectReference::from_raw_address_unchecked(obj_ref) };
     memory_manager::post_alloc::<OCaml4VM>(mutator, object, total_bytes, semantics);
 
+    eprintln!("[mmtk-ocaml4] alloc wosize={} tag={} → 0x{:x}", wosize, tag, obj_ref.as_usize());
     obj_ref.to_mut_ptr::<libc::c_void>()
 }
 

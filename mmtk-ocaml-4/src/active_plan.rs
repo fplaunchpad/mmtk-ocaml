@@ -19,8 +19,14 @@ pub struct VMActivePlan;
 
 impl ActivePlan<OCaml4VM> for VMActivePlan {
     /// True if `tls` is a registered OCaml 4.14 mutator thread.
-    fn is_mutator(_tls: VMThread) -> bool {
-        todo!("OCaml 4.14 is_mutator: check thread registry")
+    ///
+    /// For the NoGC phase we use a sentinel: spawn_gc_thread assigns the worker
+    /// tls the opaque address 1.  Any other address is treated as a mutator.
+    /// A full implementation would consult a thread registry.
+    fn is_mutator(tls: VMThread) -> bool {
+        // GC workers are spawned with tls address == 1 (sentinel).
+        // Everything else is a mutator.
+        tls.0.to_address().as_usize() != 1
     }
 
     /// Return the Mutator for the given thread.
