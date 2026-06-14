@@ -22,6 +22,11 @@ typedef void* MMTk_Mutator;
  */
 void mmtk_ocaml5_init(size_t heap_size, const char* plan);
 
+/**
+ * Start MMTk GC worker threads.  Call once after mmtk_ocaml5_init, before any allocation.
+ */
+void mmtk_ocaml5_initialize_collection(uintptr_t tls);
+
 /* ── Domain (mutator) lifecycle ─────────────────────────────────────── */
 
 /**

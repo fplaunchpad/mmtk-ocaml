@@ -19,6 +19,7 @@ use mmtk::MMTKBuilder;
 use mmtk_ocaml_common::header::{make_header, WORD_SIZE};
 use mmtk_ocaml_common::object_model::OBJECT_REF_OFFSET;
 
+use crate::active_plan::{register_mutator, deregister_by_ptr};
 use crate::{mmtk, OCaml5VM, SINGLETON};
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -33,8 +34,8 @@ pub extern "C" fn mmtk_ocaml5_init(heap_size: usize, plan: *const libc::c_char) 
         "unknown MMTk plan: {}", plan_str
     );
     assert!(
-        memory_manager::process(&mut builder, "heap_size", &heap_size.to_string()),
-        "failed to set heap_size"
+        memory_manager::process(&mut builder, "gc_trigger", &format!("FixedHeapSize:{}", heap_size)),
+        "failed to set gc_trigger/heap_size"
     );
 
     let mmtk_instance = memory_manager::mmtk_init::<OCaml5VM>(&builder);
@@ -42,6 +43,15 @@ pub extern "C" fn mmtk_ocaml5_init(heap_size: usize, plan: *const libc::c_char) 
         .set(mmtk_instance)
         .ok()
         .expect("mmtk_ocaml5_init called more than once");
+}
+
+/// Start MMTk GC worker threads.  Call once after mmtk_ocaml5_init, before any allocation.
+#[no_mangle]
+pub extern "C" fn mmtk_ocaml5_initialize_collection(tls: usize) {
+    let tls = VMThread(OpaquePointer::from_address(
+        unsafe { Address::from_usize(tls) },
+    ));
+    memory_manager::initialize_collection::<OCaml5VM>(mmtk(), tls);
 }
 
 // ── Mutator (domain) lifecycle ────────────────────────────────────────────
@@ -54,16 +64,20 @@ pub extern "C" fn mmtk_ocaml5_bind_mutator(domain_state_addr: usize) -> *mut lib
         unsafe { Address::from_usize(domain_state_addr) },
     )));
     let mutator = memory_manager::bind_mutator(mmtk(), tls);
-    // TODO: register in active_plan::DOMAIN_REGISTRY keyed by domain_state_addr
-    Box::into_raw(mutator) as *mut libc::c_void
+    let raw = Box::into_raw(mutator);
+    register_mutator(domain_state_addr, raw);
+    raw as *mut libc::c_void
 }
 
 /// Destroy the mutator for a terminating OCaml 5.x domain.
 #[no_mangle]
 pub extern "C" fn mmtk_ocaml5_destroy_mutator(mutator: *mut libc::c_void) {
-    // TODO: deregister from active_plan::DOMAIN_REGISTRY
-    let mutator = unsafe { &mut *(mutator as *mut mmtk::Mutator<OCaml5VM>) };
-    memory_manager::destroy_mutator(mutator);
+    let mutator_ptr = mutator as *mut mmtk::Mutator<OCaml5VM>;
+    deregister_by_ptr(mutator_ptr);
+    // Reconstruct the Box so the allocation is freed after destroy_mutator runs.
+    let mut mutator_box = unsafe { Box::from_raw(mutator_ptr) };
+    memory_manager::destroy_mutator(&mut *mutator_box);
+    // mutator_box drops here, freeing the Mutator allocation.
 }
 
 // ── Allocation ────────────────────────────────────────────────────────────
@@ -96,6 +110,7 @@ pub extern "C" fn mmtk_ocaml5_alloc(
     let object = unsafe { ObjectReference::from_raw_address_unchecked(obj_ref) };
     memory_manager::post_alloc::<OCaml5VM>(mutator, object, total_bytes, semantics);
 
+    eprintln!("[mmtk-ocaml5] alloc wosize={} tag={} → 0x{:x}", wosize, tag, obj_ref.as_usize());
     obj_ref.to_mut_ptr::<libc::c_void>()
 }
 
