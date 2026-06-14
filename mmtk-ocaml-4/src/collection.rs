@@ -15,7 +15,8 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use mmtk::vm::GCThreadContext;
-use mmtk::util::opaque_pointer::{VMMutatorThread, VMThread, VMWorkerThread};
+use mmtk::util::opaque_pointer::{OpaquePointer, VMMutatorThread, VMThread, VMWorkerThread};
+use mmtk::memory_manager;
 use mmtk::vm::Collection;
 use mmtk::Mutator;
 
@@ -89,9 +90,20 @@ impl Collection<OCaml4VM> for VMCollection {
     fn block_for_gc(_tls: VMMutatorThread) {}
 
     /// Spawn a Rust thread running the MMTk GC worker loop.
-    ///
-    /// TODO: create a std::thread, call memory_manager::start_worker.
-    fn spawn_gc_thread(_tls: VMThread, _ctx: GCThreadContext<OCaml4VM>) {
-        todo!("OCaml 4.14 spawn_gc_thread: std::thread::spawn + start_worker")
+    fn spawn_gc_thread(_tls: VMThread, ctx: GCThreadContext<OCaml4VM>) {
+        match ctx {
+            GCThreadContext::Worker(worker) => {
+                std::thread::spawn(move || {
+                    // TODO: use `libc::pthread_self() as usize` here instead of the hardcoded
+                    // sentinel 1. All workers currently share tls=1; this is safe for NoGC
+                    // (is_mutator just checks != 1) but will cause misidentification once we
+                    // need per-worker callbacks or move to a proper thread registry.
+                    let tls = VMWorkerThread(VMThread(OpaquePointer::from_address(
+                        unsafe { mmtk::util::Address::from_usize(1) },
+                    )));
+                    memory_manager::start_worker::<OCaml4VM>(crate::mmtk(), tls, worker);
+                });
+            }
+        }
     }
 }

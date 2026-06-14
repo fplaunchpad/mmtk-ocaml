@@ -22,6 +22,13 @@ typedef void* MMTk_Mutator;
  */
 void mmtk_init(size_t heap_size, const char* plan);
 
+/**
+ * Start MMTk GC worker threads.  Call once after mmtk_init, before any allocation.
+ *
+ * @param tls  The calling thread's ID (e.g. (uintptr_t)pthread_self()).
+ */
+void mmtk_initialize_collection(uintptr_t tls);
+
 /* ── Mutator lifecycle ──────────────────────────────────────────────── */
 
 /**
