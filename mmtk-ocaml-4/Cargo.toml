@@ -1,0 +1,16 @@
+[package]
+name    = "mmtk-ocaml-4"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+# staticlib: links into the patched OCaml 4.14 runtime
+# rlib: allows unit tests within this crate
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+mmtk             = { workspace = true }
+mmtk-ocaml-common = { path = "../mmtk-ocaml-common" }
+lazy_static      = { workspace = true }
+libc             = { workspace = true }
+atomic           = { workspace = true }

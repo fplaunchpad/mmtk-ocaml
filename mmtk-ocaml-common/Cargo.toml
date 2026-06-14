@@ -1,0 +1,8 @@
+[package]
+name    = "mmtk-ocaml-common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mmtk   = { workspace = true }
+atomic = { workspace = true }
