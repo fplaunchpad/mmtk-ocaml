@@ -17,8 +17,9 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use mmtk::vm::GCThreadContext;
-use mmtk::util::opaque_pointer::{VMMutatorThread, VMThread, VMWorkerThread};
+use mmtk::util::opaque_pointer::{OpaquePointer, VMMutatorThread, VMThread, VMWorkerThread};
 use mmtk::vm::Collection;
+use mmtk::memory_manager;
 use mmtk::Mutator;
 
 use crate::OCaml5VM;
@@ -86,7 +87,16 @@ impl Collection<OCaml5VM> for VMCollection {
     fn block_for_gc(_tls: VMMutatorThread) {}
 
     /// Spawn a Rust thread running the MMTk GC worker loop.
-    fn spawn_gc_thread(_tls: VMThread, _ctx: GCThreadContext<OCaml5VM>) {
-        todo!("OCaml 5.x spawn_gc_thread: std::thread::spawn + start_worker")
+    fn spawn_gc_thread(_tls: VMThread, ctx: GCThreadContext<OCaml5VM>) {
+        match ctx {
+            GCThreadContext::Worker(worker) => {
+                std::thread::spawn(move || {
+                    let tls = VMWorkerThread(VMThread(OpaquePointer::from_address(
+                        unsafe { mmtk::util::Address::from_usize(1) },
+                    )));
+                    memory_manager::start_worker::<OCaml5VM>(crate::mmtk(), tls, worker);
+                });
+            }
+        }
     }
 }

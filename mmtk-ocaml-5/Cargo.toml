@@ -6,7 +6,7 @@ edition = "2021"
 [lib]
 # staticlib: links into the patched OCaml 5.x runtime
 # rlib: allows unit tests within this crate
-crate-type = ["staticlib", "rlib"]
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 mmtk             = { workspace = true }
