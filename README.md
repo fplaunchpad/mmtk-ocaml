@@ -54,17 +54,6 @@ Each binding produces:
 
 See `tests/README.md` on each branch for build and run instructions.
 
-Quick smoke test (OCaml 4):
-
-```bash
-# After switching to the binding/ocaml-4 branch or worktree:
-eval $(opam env --switch=4.14.2)
-cargo build -p mmtk-ocaml-4
-gcc tests/test_nogc.c target/debug/libmmtk_ocaml_4.a \
-    -Immtk-ocaml-4/include -lpthread -ldl -lm \
-    -o /tmp/test_nogc_4 && /tmp/test_nogc_4
-```
-
 ## Development workflow
 
 OCaml 4 and OCaml 5 work is done in parallel git worktrees:
