@@ -74,8 +74,10 @@ pub extern "C" fn mmtk_ocaml5_bind_mutator(domain_state_addr: usize) -> *mut lib
 pub extern "C" fn mmtk_ocaml5_destroy_mutator(mutator: *mut libc::c_void) {
     let mutator_ptr = mutator as *mut mmtk::Mutator<OCaml5VM>;
     deregister_by_ptr(mutator_ptr);
-    let mutator = unsafe { &mut *mutator_ptr };
-    memory_manager::destroy_mutator(mutator);
+    // Reconstruct the Box so the allocation is freed after destroy_mutator runs.
+    let mut mutator_box = unsafe { Box::from_raw(mutator_ptr) };
+    memory_manager::destroy_mutator(&mut *mutator_box);
+    // mutator_box drops here, freeing the Mutator allocation.
 }
 
 // ── Allocation ────────────────────────────────────────────────────────────

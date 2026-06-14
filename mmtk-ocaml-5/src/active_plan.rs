@@ -36,16 +36,31 @@ lazy_static! {
 /// Register a mutator for the given domain address.
 pub fn register_mutator(domain_state_addr: usize, mutator: *mut Mutator<OCaml5VM>) {
     let mut map = DOMAIN_REGISTRY.write().unwrap();
-    map.insert(domain_state_addr, MutatorPtr(mutator));
+    let prev = map.insert(domain_state_addr, MutatorPtr(mutator));
+    assert!(
+        prev.is_none(),
+        "register_mutator: domain 0x{:x} already registered — bind_mutator called twice",
+        domain_state_addr
+    );
 }
 
-/// Deregister the mutator by pointer match and return it.
+/// Deregister the mutator by pointer match. Panics if the pointer is not registered.
 pub fn deregister_by_ptr(mutator_ptr: *mut Mutator<OCaml5VM>) {
     let mut map = DOMAIN_REGISTRY.write().unwrap();
-    map.retain(|_k, v| v.0 != mutator_ptr);
+    let key = map
+        .iter()
+        .find(|(_k, v)| v.0 == mutator_ptr)
+        .map(|(k, _v)| *k)
+        .expect("deregister_by_ptr: mutator pointer not found — double-free or unregistered pointer");
+    map.remove(&key);
 }
 
 impl ActivePlan<OCaml5VM> for VMActivePlan {
+    // TODO: spawn_gc_thread currently passes Address::from_usize(1) as the worker TLS.
+    // This is safe here because is_mutator uses registry lookup (not a sentinel check),
+    // so a worker with tls=1 correctly returns false as long as no domain is bound at
+    // address 1. Fix spawn_gc_thread to use pthread_self() before moving to a copying plan.
+
     /// True if `tls` corresponds to a registered OCaml 5.x domain.
     fn is_mutator(tls: VMThread) -> bool {
         let addr = tls.0.to_address().as_usize();
