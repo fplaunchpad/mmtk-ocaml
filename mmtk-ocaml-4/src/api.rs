@@ -87,8 +87,10 @@ pub extern "C" fn mmtk_bind_mutator(tls: usize) -> *mut libc::c_void {
 #[no_mangle]
 pub extern "C" fn mmtk_destroy_mutator(mutator: *mut libc::c_void) {
     // TODO: deregister from active_plan::MUTATOR_REGISTRY
-    let mutator = unsafe { &mut *(mutator as *mut mmtk::Mutator<OCaml4VM>) };
-    memory_manager::destroy_mutator(mutator);
+    // Reconstruct the Box so the allocation is freed after destroy_mutator runs.
+    let mut mutator_box = unsafe { Box::from_raw(mutator as *mut mmtk::Mutator<OCaml4VM>) };
+    memory_manager::destroy_mutator(&mut *mutator_box);
+    // mutator_box drops here, freeing the Mutator allocation.
 }
 
 // ── Allocation ────────────────────────────────────────────────────────────

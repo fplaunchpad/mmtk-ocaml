@@ -23,9 +23,15 @@ impl ActivePlan<OCaml4VM> for VMActivePlan {
     /// For the NoGC phase we use a sentinel: spawn_gc_thread assigns the worker
     /// tls the opaque address 1.  Any other address is treated as a mutator.
     /// A full implementation would consult a thread registry.
+    // TODO(sentinel): spawn_gc_thread assigns all GC workers tls = Address::from_usize(1).
+    // is_mutator relies on this sentinel: anything that is not 1 is treated as a mutator.
+    // Risk: pthread_t values are not guaranteed to be > 1 on all platforms — a real mutator
+    // could theoretically receive tls == 1 and be misclassified as a GC worker, skipping
+    // root scanning for that thread.
+    // Fix before moving off NoGC:
+    //   1. In spawn_gc_thread, use `libc::pthread_self() as usize` inside the spawned thread.
+    //   2. Replace this sentinel check with a proper thread registry (lazy_static RwLock<HashSet>).
     fn is_mutator(tls: VMThread) -> bool {
-        // GC workers are spawned with tls address == 1 (sentinel).
-        // Everything else is a mutator.
         tls.0.to_address().as_usize() != 1
     }
 

@@ -94,6 +94,10 @@ impl Collection<OCaml4VM> for VMCollection {
         match ctx {
             GCThreadContext::Worker(worker) => {
                 std::thread::spawn(move || {
+                    // TODO: use `libc::pthread_self() as usize` here instead of the hardcoded
+                    // sentinel 1. All workers currently share tls=1; this is safe for NoGC
+                    // (is_mutator just checks != 1) but will cause misidentification once we
+                    // need per-worker callbacks or move to a proper thread registry.
                     let tls = VMWorkerThread(VMThread(OpaquePointer::from_address(
                         unsafe { mmtk::util::Address::from_usize(1) },
                     )));
