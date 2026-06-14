@@ -3,6 +3,5 @@ Cargo.lock
 *.a
 *.so
 *.dylib
-docs/progress-*.md
-docs/toycaml-analysis.md
 .DS_Store
+.claude/
