@@ -38,6 +38,10 @@ pub fn ref_to_object_start(object: ObjectReference) -> Address {
 /// Reads Wosize from the object's header to compute the field count.
 #[inline(always)]
 pub fn get_current_size(object: ObjectReference) -> usize {
+    // SAFETY: `object` is a live ObjectReference inside MMTk's managed heap.
+    // ObjectReference guarantees non-null (NonZeroUsize) and WORD_SIZE alignment
+    // at construction, so `object.to_raw_address() - WORD_SIZE` is a valid,
+    // readable header address by OCaml's layout invariant (Val_hp).
     let header: usize = unsafe { ref_to_header(object).load() };
     let wosize = wosize_of(header);
     (wosize + 1) * WORD_SIZE // +1 for the header word itself
@@ -57,6 +61,21 @@ pub fn copy_object<VM: VMBinding>(
 ) -> ObjectReference {
     let size = get_current_size(from);
     let to_start = copy_context.alloc_copy(from, size, WORD_SIZE, 0, semantics);
+    assert!(
+        !to_start.is_zero(),
+        "alloc_copy returned null for object {:#x} ({} bytes, semantics {:?}): \
+         tospace exhausted during GC — heap is full and evacuation cannot complete",
+        from.to_raw_address().as_usize(),
+        size,
+        semantics,
+    );
+    // TODO(oom-protocol): Replace the assert above with a proper two-way OOM
+    // protocol: the GC worker should signal the mutator thread to raise an OCaml
+    // `Out_of_memory` exception rather than aborting the process. This requires
+    // implementing VMCollection::out_of_memory and a cross-thread signalling
+    // mechanism (likely a flag on the mutator handle checked at the next
+    // safepoint). Until VMCollection STW and root scanning are in place, abort
+    // on OOM is correct and safe.
 
     // Bulk-copy header + all fields to the new location.
     unsafe {
@@ -76,26 +95,34 @@ pub fn copy_object<VM: VMBinding>(
 }
 
 /// Copy-to variant used by delayed-copy (compacting) collectors.
+/// `to` is the destination ObjectReference pre-computed by the forward phase.
 /// Returns the address past the end of the copied object.
-pub fn copy_to_object(
-    from: ObjectReference,
-    _to: ObjectReference,
-    region: Address,
-) -> Address {
+pub fn copy_to_object(from: ObjectReference, to: ObjectReference) -> Address {
     let size = get_current_size(from);
+    let dst = ref_to_object_start(to);
+    // SAFETY: `from` is a live object in MMTk's managed heap (caller invariant).
+    // `dst` = `to.to_raw_address() - WORD_SIZE`: ObjectReference guarantees
+    // non-null and WORD_SIZE alignment, both preserved under subtraction of WORD_SIZE.
     unsafe {
         std::ptr::copy_nonoverlapping(
             ref_to_object_start(from).to_ptr::<u8>(),
-            region.to_mut_ptr::<u8>(),
+            dst.to_mut_ptr::<u8>(),
             size,
         );
     }
-    region + size
+    dst + size
 }
 
 /// Predict where the object reference will be once the object is copied
 /// to `to` (start of reserved region).
 #[inline(always)]
 pub fn get_reference_when_copied_to(_from: ObjectReference, to: Address) -> ObjectReference {
+    debug_assert!(
+        !to.is_zero() && to.is_aligned_to(WORD_SIZE),
+        "get_reference_when_copied_to: invalid region address {:#x} (null or misaligned)",
+        to.as_usize()
+    );
+    // SAFETY: `to` is validated non-null and WORD_SIZE-aligned above.
+    // Adding OBJECT_REF_OFFSET (= WORD_SIZE) preserves both properties.
     unsafe { ObjectReference::from_raw_address_unchecked(to + OBJECT_REF_OFFSET) }
 }

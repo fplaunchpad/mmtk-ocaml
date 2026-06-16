@@ -25,8 +25,8 @@ pub struct FieldSlot {
     addr: *mut AtomicUsize,
 }
 
+// Raw pointer requires explicit Send; Slot trait bound requires it.
 unsafe impl Send for FieldSlot {}
-unsafe impl Sync for FieldSlot {}
 
 impl FieldSlot {
     #[inline]
