@@ -67,8 +67,10 @@ impl ObjectModel<OCaml5VM> for VMObjectModel {
         common::copy_object::<OCaml5VM>(from, semantics, copy_context)
     }
 
-    fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address {
-        common::copy_to_object(from, to, region)
+    fn copy_to(from: ObjectReference, to: ObjectReference, _region: Address) -> Address {
+        // _region is always Address::ZERO in both current MMTk callers (MarkCompact,
+        // Compressor); the destination is derived from `to` inside copy_to_object.
+        common::copy_to_object(from, to)
     }
 
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference {
