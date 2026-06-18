@@ -12,7 +12,7 @@ use mmtk::util::copy::{CopySemantics, GCWorkerCopyContext};
 use mmtk::util::{Address, ObjectReference};
 use mmtk::vm::VMBinding;
 
-use crate::header::{wosize_of, WORD_SIZE};
+use crate::header::{tag_of, wosize_of, WORD_SIZE};
 
 /// Byte offset from the MMTk allocation result to the OCaml object reference.
 pub const OBJECT_REF_OFFSET: usize = WORD_SIZE;
@@ -31,19 +31,30 @@ pub fn ref_to_object_start(object: ObjectReference) -> Address {
     object.to_raw_address() - OBJECT_REF_OFFSET
 }
 
+// ── Header access ─────────────────────────────────────────────────────────
+
+/// Read the header word of a live OCaml object.
+///
+/// # Safety boundary
+/// `object` must be a live `ObjectReference` inside MMTk's managed heap.
+/// `ObjectReference` guarantees non-null (`NonZeroUsize`) and `WORD_SIZE`
+/// alignment, so `object.to_raw_address() - WORD_SIZE` is always a valid,
+/// readable address by OCaml's layout invariant (`Val_hp`).
+///
+/// All callers in this module rely on this invariant; it is discharged once
+/// here so that `get_current_size`, `dump_object`, and any future helpers
+/// that need the header word can remain `unsafe`-free.
+#[inline(always)]
+pub fn read_header(object: ObjectReference) -> usize {
+    unsafe { ref_to_header(object).load() }
+}
+
 // ── Size ──────────────────────────────────────────────────────────────────
 
 /// Total allocated size of an object in bytes: header word + all fields.
-///
-/// Reads Wosize from the object's header to compute the field count.
 #[inline(always)]
 pub fn get_current_size(object: ObjectReference) -> usize {
-    // SAFETY: `object` is a live ObjectReference inside MMTk's managed heap.
-    // ObjectReference guarantees non-null (NonZeroUsize) and WORD_SIZE alignment
-    // at construction, so `object.to_raw_address() - WORD_SIZE` is a valid,
-    // readable header address by OCaml's layout invariant (Val_hp).
-    let header: usize = unsafe { ref_to_header(object).load() };
-    let wosize = wosize_of(header);
+    let wosize = wosize_of(read_header(object));
     (wosize + 1) * WORD_SIZE // +1 for the header word itself
 }
 
@@ -111,6 +122,19 @@ pub fn copy_to_object(from: ObjectReference, to: ObjectReference) -> Address {
         );
     }
     dst + size
+}
+
+// ── Debug ─────────────────────────────────────────────────────────────────
+
+/// Print a one-line description of an OCaml heap object to stderr.
+pub fn dump_object(object: ObjectReference) {
+    let header = read_header(object);
+    eprintln!(
+        "OCaml object @ {:#x}: wosize={} tag={}",
+        object.to_raw_address().as_usize(),
+        wosize_of(header),
+        tag_of(header),
+    );
 }
 
 /// Predict where the object reference will be once the object is copied

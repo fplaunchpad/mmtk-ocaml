@@ -82,12 +82,6 @@ impl ObjectModel<OCaml5VM> for VMObjectModel {
     }
 
     fn dump_object(object: ObjectReference) {
-        let header: usize = unsafe { common::ref_to_header(object).load() };
-        eprintln!(
-            "OCaml5 object @ {:?}: wosize={} tag={}",
-            object,
-            header >> 10,
-            header & 0xFF
-        );
+        common::dump_object(object);
     }
 }

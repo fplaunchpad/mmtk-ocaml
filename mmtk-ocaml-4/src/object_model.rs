@@ -97,12 +97,6 @@ impl ObjectModel<OCaml4VM> for VMObjectModel {
     }
 
     fn dump_object(object: ObjectReference) {
-        let header: usize = unsafe { common::ref_to_header(object).load() };
-        eprintln!(
-            "OCaml4 object @ {:?}: wosize={} tag={}",
-            object,
-            header >> 10,
-            header & 0xFF
-        );
+        common::dump_object(object);
     }
 }

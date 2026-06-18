@@ -31,9 +31,13 @@ impl VMBinding for OCaml4VM {
     type VMSlot          = mmtk_ocaml_common::slot::FieldSlot;
     type VMMemorySlice   = mmtk_ocaml_common::slot::UnimplementedMemorySlice;
 
-    // OCaml allocates word-aligned objects; max alignment for SIMD types is 16 bytes.
+    // Every OCaml allocation requests WORD_SIZE alignment and offset=0.
+    // MIN = MAX = WORD_SIZE: no alignment padding ever needed for copies.
+    // USE_ALLOCATION_OFFSET = false: we always pass offset=0, lets MMTk skip
+    // the offset branch in the allocator fast path.
     const MIN_ALIGNMENT: usize = mmtk_ocaml_common::header::WORD_SIZE;
-    const MAX_ALIGNMENT: usize = 16;
+    const MAX_ALIGNMENT: usize = mmtk_ocaml_common::header::WORD_SIZE;
+    const USE_ALLOCATION_OFFSET: bool = false;
 }
 
 /// The global MMTk instance.  Initialised once by `mmtk_init` in api.rs.
