@@ -9,8 +9,9 @@ OCaml runtime.
 ```
 mmtk-ocaml/
 ├── Cargo.toml              # Cargo workspace root
-├── mmtk-core/              # mmtk-core (git submodule — pinned commit)
-├── mmtk-ocaml-5/           # OCaml 5.x binding (multi-domain, interrupt_word STW)
+├── mmtk-core/              # mmtk-core (git submodule)
+├── ocaml-5/                # OCaml 5.4.1 source (git submodule — built in-tree)
+├── mmtk-ocaml-5/           # OCaml 5.x MMTk binding
 │   ├── src/
 │   ├── include/mmtk_ocaml.h
 │   └── Cargo.toml
@@ -22,7 +23,6 @@ mmtk-ocaml/
 ```bash
 git clone --recursive https://github.com/your-org/mmtk-ocaml
 cd mmtk-ocaml
-cargo build
 ```
 
 If you already cloned without `--recursive`:
@@ -36,30 +36,35 @@ git submodule update --init
 | Dependency | Version | Notes |
 |---|---|---|
 | Rust | stable 2021 | `rustup update stable` |
-| mmtk-core | pinned in submodule | fetched automatically via `git submodule update --init` |
-| OCaml 5.x | 5.4.0+ | system package or `opam switch create 5.4.0` |
+| GCC / make | system | for building OCaml and C tests |
+| mmtk-core | pinned in submodule | no separate install needed |
+| OCaml 5.4.1 | pinned in submodule | built in-tree via `make ocaml` |
 
 ## Building
 
 ```bash
+# Build the Rust binding
 cargo build
+
+# Build the OCaml compiler from the submodule (needed for OCaml tests)
+make ocaml
 ```
 
-Produces `target/debug/libmmtk_ocaml_5.{a,so}`.
+`make ocaml` runs `./configure && make` inside `ocaml-5/` and produces
+`ocaml-5/ocamlopt.opt`. This is a one-time step; subsequent `make test` calls
+skip it if the compiler is already built.
 
 ## Running tests
 
 ```bash
-# C-only test (no OCaml runtime needed)
-gcc -o tests/test_nogc_c tests/test_nogc_c.c \
-    -I mmtk-ocaml-5/include -L target/debug -lmmtk_ocaml_5 -lpthread -ldl -lm
-LD_LIBRARY_PATH=target/debug ./tests/test_nogc_c
+# C test only (no OCaml compiler needed)
+make test-c
 
-# OCaml integration test (requires OCaml 5 ocamlopt)
-gcc -c tests/stubs.c -I mmtk-ocaml-5/include -I $(ocamlopt -where) -o tests/stubs.o
-ocamlopt tests/test_nogc.ml tests/stubs.o target/debug/libmmtk_ocaml_5.a \
-    -cclib "-lpthread -ldl -lm" -o tests/test_nogc
-LD_LIBRARY_PATH=target/debug ./tests/test_nogc
+# Both tests (builds OCaml compiler first if not already done)
+make test
+
+# Release build
+make test PROFILE=release
 ```
 
 ## Architecture
