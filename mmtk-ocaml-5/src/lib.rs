@@ -2,9 +2,6 @@
 //!
 //! Architecture: one mutator per OCaml domain (caml_domain_state*);
 //! STW via the domain-interrupt mechanism; roots via per-domain caml_do_roots.
-//!
-//! Agents working in this worktree should only edit files under mmtk-ocaml-5/.
-//! Shared types live in mmtk-ocaml-common/ — read-only from this crate.
 
 use std::sync::OnceLock;
 
@@ -14,9 +11,11 @@ use mmtk::MMTK;
 pub mod active_plan;
 pub mod api;
 pub mod collection;
+pub mod header;
 pub mod object_model;
 pub mod reference_glue;
 pub mod scanning;
+pub mod slot;
 
 /// The OCaml 5.x VM tag — zero-sized, used only as a type parameter.
 #[derive(Default)]
@@ -28,15 +27,15 @@ impl VMBinding for OCaml5VM {
     type VMCollection    = collection::VMCollection;
     type VMActivePlan    = active_plan::VMActivePlan;
     type VMReferenceGlue = reference_glue::VMReferenceGlue;
-    type VMSlot          = mmtk_ocaml_common::slot::FieldSlot;
-    type VMMemorySlice   = mmtk_ocaml_common::slot::UnimplementedMemorySlice;
+    type VMSlot          = slot::FieldSlot;
+    type VMMemorySlice   = slot::UnimplementedMemorySlice;
 
     // Every OCaml allocation requests WORD_SIZE alignment and offset=0.
     // MIN = MAX = WORD_SIZE: no alignment padding ever needed for copies.
     // USE_ALLOCATION_OFFSET = false: we always pass offset=0, lets MMTk skip
     // the offset branch in the allocator fast path.
-    const MIN_ALIGNMENT: usize = mmtk_ocaml_common::header::WORD_SIZE;
-    const MAX_ALIGNMENT: usize = mmtk_ocaml_common::header::WORD_SIZE;
+    const MIN_ALIGNMENT: usize = header::WORD_SIZE;
+    const MAX_ALIGNMENT: usize = header::WORD_SIZE;
     const USE_ALLOCATION_OFFSET: bool = false;
 }
 

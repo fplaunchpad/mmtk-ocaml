@@ -9,8 +9,7 @@ edition = "2021"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-mmtk             = { workspace = true }
-mmtk-ocaml-common = { path = "../mmtk-ocaml-common" }
-lazy_static      = { workspace = true }
-libc             = { workspace = true }
-atomic           = { workspace = true }
+mmtk        = { workspace = true }
+lazy_static = { workspace = true }
+libc        = { workspace = true }
+atomic      = { workspace = true }

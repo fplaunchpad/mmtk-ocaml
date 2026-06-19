@@ -16,8 +16,8 @@ use mmtk::util::{Address, ObjectReference};
 use mmtk::AllocationSemantics;
 use mmtk::MMTKBuilder;
 
-use mmtk_ocaml_common::header::{make_header, WORD_SIZE};
-use mmtk_ocaml_common::object_model::OBJECT_REF_OFFSET;
+use crate::header::{make_header, WORD_SIZE};
+use crate::object_model::OBJECT_REF_OFFSET;
 
 use crate::active_plan::{register_mutator, deregister_by_ptr};
 use crate::{mmtk, OCaml5VM, SINGLETON};

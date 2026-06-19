@@ -1,5 +1,0 @@
-*.o
-*.cmi
-*.cmx
-test_nogc_c_5
-test_nogc_5
