@@ -31,55 +31,6 @@ pub fn read_header(object: ObjectReference) -> usize {
     unsafe { (object.to_raw_address() - OBJECT_REF_OFFSET).load() }
 }
 
-fn copy_object(
-    from: ObjectReference,
-    semantics: CopySemantics,
-    copy_context: &mut GCWorkerCopyContext<OCaml5VM>,
-) -> ObjectReference {
-    let size = VMObjectModel::get_current_size(from);
-    let from_start = VMObjectModel::ref_to_object_start(from);
-
-    let to_start = copy_context.alloc_copy(from, size, WORD_SIZE, 0, semantics);
-    assert!(
-        !to_start.is_zero(),
-        "alloc_copy returned null for object {:#x} ({} bytes, semantics {:?}): \
-         tospace exhausted — heap is full and evacuation cannot complete",
-        from.to_raw_address().as_usize(),
-        size,
-        semantics,
-    );
-    // TODO(oom-protocol): Replace assert with proper two-way OOM protocol.
-    // GC worker should signal the mutator to raise OCaml Out_of_memory rather
-    // than aborting.  Requires VMCollection::out_of_memory and a cross-thread
-    // flag on the mutator handle checked at the next safepoint.
-
-    // SAFETY: from_start is (non-null, word-aligned): derived from ObjectReference.
-    // to_start is (non-null, word-aligned): asserted above + alloc_copy contract.
-    unsafe {
-        std::ptr::copy_nonoverlapping(from_start.to_ptr::<u8>(), to_start.to_mut_ptr::<u8>(), size);
-    }
-
-    // SAFETY: to_start non-null and word-aligned; adding WORD_SIZE preserves both.
-    let to_ref = unsafe {
-        ObjectReference::from_raw_address_unchecked(to_start + OBJECT_REF_OFFSET)
-    };
-    copy_context.post_copy(to_ref, size, semantics);
-    to_ref
-}
-
-fn copy_to_object(from: ObjectReference, to: ObjectReference) -> Address {
-    let size = VMObjectModel::get_current_size(from);
-    let from_start = VMObjectModel::ref_to_object_start(from);
-    let dst = VMObjectModel::ref_to_object_start(to);
-    // SAFETY: both from_start and dst come from ObjectReference, which guarantees
-    // non-null and WORD_SIZE alignment; ref_to_object_start subtracts WORD_SIZE,
-    // preserving both.
-    unsafe {
-        std::ptr::copy_nonoverlapping(from_start.to_ptr::<u8>(), dst.to_mut_ptr::<u8>(), size);
-    }
-    dst + size
-}
-
 pub struct VMObjectModel;
 
 impl ObjectModel<OCaml5VM> for VMObjectModel {
@@ -132,13 +83,50 @@ impl ObjectModel<OCaml5VM> for VMObjectModel {
         semantics: CopySemantics,
         copy_context: &mut GCWorkerCopyContext<OCaml5VM>,
     ) -> ObjectReference {
-        copy_object(from, semantics, copy_context)
+        let size = VMObjectModel::get_current_size(from);
+        let from_start = VMObjectModel::ref_to_object_start(from);
+
+        let to_start = copy_context.alloc_copy(from, size, WORD_SIZE, 0, semantics);
+        assert!(
+            !to_start.is_zero(),
+            "alloc_copy returned null for object {:#x} ({} bytes, semantics {:?}): \
+             tospace exhausted — heap is full and evacuation cannot complete",
+            from.to_raw_address().as_usize(),
+            size,
+            semantics,
+        );
+        // TODO(oom-protocol): Replace assert with proper two-way OOM protocol.
+        // GC worker should signal the mutator to raise OCaml Out_of_memory rather
+        // than aborting.  Requires VMCollection::out_of_memory and a cross-thread
+        // flag on the mutator handle checked at the next safepoint.
+
+        // SAFETY: from_start is (non-null, word-aligned): derived from ObjectReference.
+        // to_start is (non-null, word-aligned): asserted above + alloc_copy contract.
+        unsafe {
+            std::ptr::copy_nonoverlapping(from_start.to_ptr::<u8>(), to_start.to_mut_ptr::<u8>(), size);
+        }
+
+        // SAFETY: to_start non-null and word-aligned; adding WORD_SIZE preserves both.
+        let to_ref = unsafe {
+            ObjectReference::from_raw_address_unchecked(to_start + OBJECT_REF_OFFSET)
+        };
+        copy_context.post_copy(to_ref, size, semantics);
+        to_ref
     }
 
     fn copy_to(from: ObjectReference, to: ObjectReference, _region: Address) -> Address {
         // _region is always Address::ZERO in both current MMTk callers (MarkCompact,
         // Compressor); destination is derived from `to` inside copy_to_object.
-        copy_to_object(from, to)
+        let size = VMObjectModel::get_current_size(from);
+        let from_start = VMObjectModel::ref_to_object_start(from);
+        let dst = VMObjectModel::ref_to_object_start(to);
+        // SAFETY: both from_start and dst come from ObjectReference, which guarantees
+        // non-null and WORD_SIZE alignment; ref_to_object_start subtracts WORD_SIZE,
+        // preserving both.
+        unsafe {
+            std::ptr::copy_nonoverlapping(from_start.to_ptr::<u8>(), dst.to_mut_ptr::<u8>(), size);
+        }
+        dst + size
     }
 
     fn get_reference_when_copied_to(_from: ObjectReference, to: Address) -> ObjectReference {
