@@ -1,9 +1,11 @@
-PROFILE     ?= debug
+PROFILE  ?= debug
+ROOT     := $(abspath ..)
 
-LIBSTATIC   := ../target/$(PROFILE)/libmmtk_ocaml_5.a
-INCLUDE     := ../mmtk-ocaml-5/include
-OCAMLOPT    := ../ocaml-5/ocamlopt.opt
-OCAML_WHERE := ../ocaml-5/runtime
+LIBSTATIC   := $(ROOT)/target/$(PROFILE)/libmmtk_ocaml_5.a
+INCLUDE     := $(ROOT)/mmtk-ocaml-5/include
+OCAMLOPT    := $(ROOT)/ocaml-5/ocamlopt.opt
+OCAML_WHERE := $(ROOT)/ocaml-5/runtime
+OCAML_STDLIB := $(ROOT)/ocaml-5/stdlib
 
 # === Test binaries ===
 
@@ -14,7 +16,7 @@ stubs.o: stubs.c $(OCAMLOPT)
 	gcc -c -o $@ $< -I $(INCLUDE) -I $(OCAML_WHERE)
 
 test_nogc: test_nogc.ml stubs.o $(LIBSTATIC) $(OCAMLOPT)
-	OCAMLLIB=$(abspath $(dir $(OCAMLOPT))stdlib) \
+	OCAMLLIB=$(OCAML_STDLIB) \
 	  $(OCAMLOPT) $< stubs.o $(LIBSTATIC) -cclib "-lpthread -ldl -lm" -o $@
 
 # === Run targets ===
