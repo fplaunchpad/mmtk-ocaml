@@ -21,11 +21,11 @@ $(OCAMLOPT): $(OCAML_SRC)/configure
 # === Tests (delegated to tests/Makefile) ===
 
 .PHONY: test-c
-test-c:
+test-c: build
 	$(MAKE) -C tests test-c PROFILE=$(PROFILE)
 
 .PHONY: test-ocaml test
-test-ocaml test: ocaml
+test-ocaml test: build ocaml
 	$(MAKE) -C tests $@ PROFILE=$(PROFILE)
 
 # === Housekeeping ===
