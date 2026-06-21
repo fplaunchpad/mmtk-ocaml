@@ -14,9 +14,9 @@ static int g_init = 0;
  * implementation must use pthread_once and keep a per-thread mutator handle. */
 static void ensure_init(void) {
     if (g_init) return;
-    mmtk_ocaml5_init(256 * 1024 * 1024, "NoGC");
+    /* Global MMTk init is now done by caml_init_gc in the OCaml runtime.
+     * We only need to bind a mutator handle for this thread. */
     uintptr_t tls = (uintptr_t)pthread_self();
-    mmtk_ocaml5_initialize_collection(tls);
     g_mutator = mmtk_ocaml5_bind_mutator(tls);
     g_init = 1;
 }

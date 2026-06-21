@@ -14,8 +14,10 @@ build:
 .PHONY: ocaml
 ocaml: $(OCAMLOPT)
 
+MMTK_INCLUDE := $(abspath mmtk-ocaml-5/include)
+
 $(OCAMLOPT): $(OCAML_SRC)/configure
-	cd $(OCAML_SRC) && ./configure
+	cd $(OCAML_SRC) && CPPFLAGS="-I$(MMTK_INCLUDE)" ./configure
 	$(MAKE) -C $(OCAML_SRC) -j$(shell nproc)
 
 # === Tests (delegated to tests/Makefile) ===
