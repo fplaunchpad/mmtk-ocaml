@@ -4,13 +4,16 @@ MMTk memory management bindings for OCaml 5.x, implementing the
 [MMTk](https://www.mmtk.io) VMBinding trait as a drop-in GC backend for the
 OCaml runtime.
 
+> **Note:** This project uses a [modified fork of OCaml 5](https://github.com/r41k0u/ocaml/tree/mmtk)
+> with minimal runtime patches to wire in MMTk. These patches should eventually be upstreamed
+> into the official OCaml repository.
+
 ## Repository layout
 
 ```
 mmtk-ocaml/
-├── Cargo.toml              # Cargo workspace root
-├── mmtk-core/              # mmtk-core (git submodule)
-├── ocaml-5/                # OCaml 5.4.1 source (git submodule — built in-tree)
+├── Cargo.toml              # Cargo workspace root (mmtk pulled from crates.io)
+├── ocaml-5/                # OCaml 5.4.1 fork (git submodule — built in-tree)
 ├── mmtk-ocaml-5/           # OCaml 5.x MMTk binding
 │   ├── src/
 │   ├── include/mmtk_ocaml.h
@@ -37,7 +40,7 @@ git submodule update --init
 |---|---|---|
 | Rust | stable 2021 | `rustup update stable` |
 | GCC / make | system | for building OCaml and C tests |
-| mmtk-core | pinned in submodule | no separate install needed |
+| mmtk-core | 0.32.0 (crates.io) | fetched automatically by Cargo |
 | OCaml 5.4.1 | pinned in submodule | built in-tree via `make ocaml` |
 
 ## Building

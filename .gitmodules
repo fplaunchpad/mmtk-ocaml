@@ -1,6 +1,4 @@
-[submodule "mmtk-core"]
-	path = mmtk-core
-	url = https://github.com/mmtk/mmtk-core
 [submodule "ocaml-5"]
 	path = ocaml-5
-	url = https://github.com/ocaml/ocaml
+	url = https://github.com/r41k0u/ocaml
+	branch = mmtk
